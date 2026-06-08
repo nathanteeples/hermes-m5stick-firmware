@@ -232,7 +232,7 @@ public:
     panel_cfg.panel_height = 320;
     panel_cfg.offset_x = 0;
     panel_cfg.offset_y = 0;
-    panel_cfg.offset_rotation = 0;
+    panel_cfg.offset_rotation = 2;
     panel_cfg.dummy_read_pixel = 8;
     panel_cfg.dummy_read_bits = 1;
     panel_cfg.readable = true;

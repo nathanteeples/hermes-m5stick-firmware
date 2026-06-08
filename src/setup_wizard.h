@@ -28,7 +28,7 @@ inline void runSetupWizard() {
   spr.setTextDatum(MC_DATUM);
   spr.setTextSize(1);
   spr.setTextColor(0xFFFF, 0x0842);
-  spr.drawString("Scansione Wi-Fi...", W / 2, H / 2);
+  spr.drawString("Scanning Wi-Fi...", W / 2, H / 2);
   spr.pushSprite(0, 0);
 
   // Scan networks
@@ -78,7 +78,7 @@ inline void runSetupWizard() {
   server.on("/", HTTP_GET, [&]() {
     String html = R"rawliteral(
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -274,33 +274,33 @@ inline void runSetupWizard() {
 <body>
   <div class="container">
     <h1>Hermes Buddy</h1>
-    <div class="subtitle">Configurazione Iniziale</div>
+    <div class="subtitle">Initial Setup</div>
     
     <form action="/save" method="POST" id="setupForm">
       <!-- Wi-Fi SSID Dropdown & Input -->
       <div class="form-group">
-        <label for="wifiSelect">Reti Wi-Fi rilevate</label>
+        <label for="wifiSelect">Detected Wi-Fi Networks</label>
         <select id="wifiSelect" onchange="selectWifiNetwork()">
-          <option value="">-- Seleziona una rete --</option>
+          <option value="">-- Select a network --</option>
           WIFI_OPTIONS_PLACEHOLDER
-          <option value="custom">Inserisci manualmente...</option>
+          <option value="custom">Enter manually...</option>
         </select>
-        <div class="field-help">Seleziona la tua rete Wi-Fi domestica. Nota: Hermes Buddy supporta solo reti a 2.4 GHz.</div>
+        <div class="field-help">Select your home Wi-Fi network. Note: Hermes Buddy only supports 2.4 GHz networks.</div>
       </div>
 
       <div class="form-group" id="manualSsidGroup" style="display: none;">
         <label for="ssid">SSID Wi-Fi</label>
-        <input type="text" id="ssid" name="ssid" placeholder="Nome della rete" maxlength="32">
-        <div class="field-help">Inserisci manualmente il nome (SSID) della tua rete Wi-Fi.</div>
+        <input type="text" id="ssid" name="ssid" placeholder="Network name" maxlength="32">
+        <div class="field-help">Enter your Wi-Fi network name (SSID) manually.</div>
       </div>
 
       <div class="form-group">
         <label for="pass">Password Wi-Fi</label>
         <div class="input-wrapper">
-          <input type="password" id="pass" name="pass" placeholder="Password della rete" maxlength="63">
-          <button type="button" class="password-toggle" onclick="togglePassword('pass')">mostra</button>
+          <input type="password" id="pass" name="pass" placeholder="Network password" maxlength="63">
+          <button type="button" class="password-toggle" onclick="togglePassword('pass')">show</button>
         </div>
-        <div class="field-help">La password della rete Wi-Fi selezionata. Lascia vuoto se la rete è aperta.</div>
+        <div class="field-help">The password for the selected Wi-Fi network. Leave blank if the network is open.</div>
       </div>
 
       <!-- Groq API Key -->
@@ -308,20 +308,20 @@ inline void runSetupWizard() {
         <label for="groq">API Key Groq</label>
         <div class="input-wrapper">
           <input type="password" id="groq" name="groq" placeholder="gsk_..." required maxlength="127">
-          <button type="button" class="password-toggle" onclick="togglePassword('groq')">mostra</button>
+          <button type="button" class="password-toggle" onclick="togglePassword('groq')">show</button>
         </div>
-        <div class="field-help">Usata per la trascrizione vocale ultra-rapida. Genera una chiave gratuita su <a href="https://console.groq.com/keys" target="_blank">console.groq.com</a> (inizia con <code>gsk_</code>).</div>
+        <div class="field-help">Used for fast voice transcription. Generate a free key at <a href="https://console.groq.com/keys" target="_blank">console.groq.com</a> (starts with <code>gsk_</code>).</div>
       </div>
 
       <!-- Hermes Server Address & Port -->
       <div class="flex-row">
         <div class="form-group">
-          <label for="ip">Indirizzo Hermes</label>
-          <input type="text" id="ip" name="ip" placeholder="192.168.1.100 o host" required maxlength="63" value="192.168.1.100">
-          <div class="field-help">L'IP locale (es. <code>192.168.1.X</code>) o l'host del PC su cui gira il tuo server Hermes.</div>
+          <label for="ip">Hermes Address</label>
+          <input type="text" id="ip" name="ip" placeholder="192.168.1.100 or hostname" required maxlength="63" value="192.168.1.100">
+          <div class="field-help">The local IP address (for example <code>192.168.1.X</code>) or hostname of the computer running your Hermes server.</div>
         </div>
         <div class="form-group port-group">
-          <label for="port">Porta</label>
+          <label for="port">Port</label>
           <input type="number" id="port" name="port" placeholder="8642" value="8642" required min="1" max="65535">
           <div class="field-help">Default: 8642.</div>
         </div>
@@ -332,12 +332,12 @@ inline void runSetupWizard() {
         <label for="hkey">API Key Hermes</label>
         <div class="input-wrapper">
           <input type="password" id="hkey" name="hkey" placeholder="API Key Hermes" required maxlength="63">
-          <button type="button" class="password-toggle" onclick="togglePassword('hkey')">mostra</button>
+          <button type="button" class="password-toggle" onclick="togglePassword('hkey')">show</button>
         </div>
-        <div class="field-help">La chiave API di autenticazione configurata nel tuo server Hermes.</div>
+        <div class="field-help">The authentication API key configured in your Hermes server.</div>
       </div>
 
-      <button type="submit" class="btn-submit">Salva e Riavvia</button>
+      <button type="submit" class="btn-submit">Save and Restart</button>
     </form>
     
     <div class="footer">Hermes Buddy Setup Portal</div>
@@ -349,10 +349,10 @@ inline void runSetupWizard() {
       const btn = input.nextElementSibling;
       if (input.type === "password") {
         input.type = "text";
-        btn.textContent = "nascondi";
+        btn.textContent = "hide";
       } else {
         input.type = "password";
-        btn.textContent = "mostra";
+        btn.textContent = "show";
       }
     }
 
@@ -384,7 +384,7 @@ inline void runSetupWizard() {
       const ssidInput = document.getElementById('ssid');
       if (select.value === '' && ssidInput.value === '') {
         e.preventDefault();
-        alert('Per favore, seleziona o inserisci una rete Wi-Fi.');
+        alert('Please select or enter a Wi-Fi network.');
       }
     });
   </script>
@@ -428,11 +428,11 @@ inline void runSetupWizard() {
 
       String successHtml = R"rawliteral(
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Configurazione Completata</title>
+  <title>Setup Complete</title>
   <style>
     body {
       background-color: #0b0f19;
@@ -477,8 +477,8 @@ inline void runSetupWizard() {
 </head>
 <body>
   <div class="card">
-    <h1>Salvataggio...</h1>
-    <p>Configurazione salvata con successo! Il dispositivo si sta riavviando.</p>
+    <h1>Saving...</h1>
+    <p>Configuration saved successfully. The device is restarting.</p>
     <div class="spinner"></div>
   </div>
 </body>
@@ -489,7 +489,7 @@ inline void runSetupWizard() {
       shouldReboot = true;
       rebootTime = millis() + 2000;
     } else {
-      server.send(400, "text/plain", "Parametri non validi!");
+      server.send(400, "text/plain", "Invalid parameters.");
     }
   });
 
@@ -498,7 +498,7 @@ inline void runSetupWizard() {
       server.sendHeader("Location", "http://192.168.4.1/", true);
       server.send(302, "text/plain", "");
     } else {
-      server.send(404, "text/plain", "Non Trovato");
+      server.send(404, "text/plain", "Not Found");
     }
   });
 
@@ -541,7 +541,7 @@ inline void runSetupWizard() {
       
       spr.setTextSize(1);
       spr.setTextColor(txtCol, bgCol);
-      spr.drawString("Connetti al Wi-Fi:", cx, 55);
+      spr.drawString("Connect to Wi-Fi:", cx, 55);
       
       int ssidW = spr.textWidth(apName) + 16;
       spr.fillRoundRect(cx - ssidW/2, 68, ssidW, 20, 4, 0x18E3);
@@ -563,7 +563,7 @@ inline void runSetupWizard() {
       
       spr.setTextSize(1);
       spr.setTextColor(txtCol, bgCol);
-      spr.drawString("Apri il browser su:", cx, 185);
+      spr.drawString("Open browser at:", cx, 185);
       
       spr.fillRoundRect(cx - 50, 195, 100, 18, 4, 0x18E3);
       spr.setTextColor(0xFFFF, 0x18E3);
@@ -572,7 +572,7 @@ inline void runSetupWizard() {
       spr.setTextSize(1);
       spr.setTextColor(0x94B2, bgCol);
       char clientsBuf[32];
-      snprintf(clientsBuf, sizeof(clientsBuf), "Dispositivi: %d", clients);
+      snprintf(clientsBuf, sizeof(clientsBuf), "Devices: %d", clients);
       spr.drawString(clientsBuf, cx, 227);
       
       if (clients > 0) {

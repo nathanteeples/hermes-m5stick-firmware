@@ -394,19 +394,19 @@ static void drawFactoryResetWarning() {
   spr.setTextDatum(MC_DATUM);
   
   spr.setTextColor(HOT, PANEL);
-  spr.drawString("ATTENZIONE!", W / 2, my + 15);
+  spr.drawString("WARNING!", W / 2, my + 15);
   
   spr.setTextColor(p.text, PANEL);
-  spr.drawString("Questo cancellera", W / 2, my + 45);
-  spr.drawString("tutti i dati e", W / 2, my + 60);
-  spr.drawString("le impostazioni.", W / 2, my + 75);
+  spr.drawString("This will erase", W / 2, my + 45);
+  spr.drawString("all data and", W / 2, my + 60);
+  spr.drawString("settings.", W / 2, my + 75);
   
   spr.setTextColor(0x5AEB, PANEL); // bright yellow/orange
-  spr.drawString("Premi 2 volte A", W / 2, my + 105);
-  spr.drawString("per confermare.", W / 2, my + 120);
+  spr.drawString("Press A twice", W / 2, my + 105);
+  spr.drawString("to confirm.", W / 2, my + 120);
   
   spr.setTextColor(p.textDim, PANEL);
-  spr.drawString("B per annullare", W / 2, my + 145);
+  spr.drawString("B to cancel", W / 2, my + 145);
   
   spr.setTextDatum(TL_DATUM);
 }
@@ -2719,7 +2719,7 @@ void loop() {
     napStartMs = now;
     M5.Axp.ScreenBreath(8);
     dimmed = true;
-    statsSave(); // Salva i token e le statistiche accumulate all'inizio del sonno
+    statsSave(); // Save accumulated tokens and stats when sleep begins.
   } else if (napping && faceDownFrames <= -8) {
     napping = false;
     statsOnNapEnd((now - napStartMs) / 1000);
@@ -2734,7 +2734,7 @@ void loop() {
       && millis() - lastInteractMs > SCREEN_OFF_MS) {
     M5.Axp.SetLDO2(false);
     screenOff = true;
-    statsSave(); // Salva i token e le statistiche accumulate allo spegnimento dello schermo
+    statsSave(); // Save accumulated tokens and stats when the screen turns off.
   }
 
   delay(screenOff ? 100 : 16);
