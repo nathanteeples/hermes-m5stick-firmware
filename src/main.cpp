@@ -68,6 +68,16 @@ const uint16_t HB_GREEN = 0x07E0;
 const uint16_t HOT   = 0xFA20;   // red-orange: warnings, impatience, deny
 const uint16_t PANEL = 0x2104;   // overlay panel background
 
+static void pushPortraitSprite() {
+  if (DISPLAY_X_OFFSET > 0) {
+    int rightX = DISPLAY_X_OFFSET + W;
+    int rightW = M5.Lcd.width() - rightX;
+    M5.Lcd.fillRect(0, 0, DISPLAY_X_OFFSET, H, 0x0000);
+    if (rightW > 0) M5.Lcd.fillRect(rightX, 0, rightW, H, 0x0000);
+  }
+  spr.pushSprite(DISPLAY_X_OFFSET, 0);
+}
+
 enum PersonaState { P_SLEEP, P_IDLE, P_BUSY, P_ATTENTION, P_CELEBRATE, P_DIZZY, P_HEART };
 const char* stateNames[] = { "sleep", "idle", "busy", "attention", "celebrate", "dizzy", "heart" };
 
@@ -807,9 +817,6 @@ static void clockLandscapeCompose(TFT_eSPI* t, const Palette& p) {
   t->setTextSize(3); t->setTextColor(p.text, p.bg);    t->drawString(hm, 170, 42);
   t->setTextSize(2); t->setTextColor(p.textDim, p.bg); t->drawString(ssl, 170, 72);
                                                        t->drawString(wdl, 170, 102);
-  if (!_onUsb) {
-    t->setTextSize(1); t->setTextColor(0xF800, p.bg);  t->drawString("No USB", 170, 120);
-  }
   t->setTextDatum(TL_DATUM);
   t->setTextSize(1);
 }
@@ -830,10 +837,6 @@ static void drawClock() {
     spr.setTextSize(4); spr.setTextColor(p.text, p.bg);    spr.drawString(hm, CX, 140);
     spr.setTextSize(2); spr.setTextColor(p.textDim, p.bg); spr.drawString(ss, CX, 175);
     spr.setTextSize(1);                                     spr.drawString(dl, CX, 200);
-    if (!_onUsb) {
-      spr.setTextColor(0xF800, p.bg);
-      spr.drawString("No USB", CX, 218);
-    }
     spr.setTextDatum(TL_DATUM);
     return;
   }
@@ -1489,7 +1492,7 @@ void drawVoiceProcessing() {
     spr.drawString(voiceCancelling ? "please wait" : "B to cancel", CX, H - 18);
     spr.setTextDatum(TL_DATUM);
     drawInsetBorder(&spr, p.textDim);
-    spr.pushSprite(DISPLAY_X_OFFSET, 0);
+    pushPortraitSprite();
     voiceProcFirstDraw = true;   // re-init the direct path if the sprite is freed again
     return;
   }
@@ -2200,7 +2203,7 @@ void setup() {
           // Phase 3: Graphic welcome
           drawGraphicWelcome(elapsed, wifiConnected, frame, p);
         }
-        spr.pushSprite(DISPLAY_X_OFFSET, 0);
+        pushPortraitSprite();
       } else {
         M5.Lcd.fillScreen(p.bg);
         M5.Lcd.setTextDatum(MC_DATUM);
@@ -2701,9 +2704,9 @@ void loop() {
       else if (sessionsOpen) drawSessions();
       else if (settingsOpen) drawSettings();
       else if (menuOpen) drawMenu();
-      spr.pushSprite(DISPLAY_X_OFFSET, 0);
+      pushPortraitSprite();
     } else if (voiceState == VOICE_RESPONSE || voiceState == VOICE_ERROR) {
-      spr.pushSprite(DISPLAY_X_OFFSET, 0);
+      pushPortraitSprite();
     }
   }
 

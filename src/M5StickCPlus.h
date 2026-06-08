@@ -188,8 +188,10 @@ static constexpr int HOSYOND_I2S_BCK = 5;
 static constexpr int HOSYOND_I2S_DIN = 6;
 static constexpr int HOSYOND_I2S_WS = 7;
 static constexpr int HOSYOND_I2S_DOUT = 8;
+static constexpr int HOSYOND_TOUCH_PHYSICAL_W = 240;
 static constexpr uint8_t HOSYOND_FT6336_ADDR = 0x38;
 static constexpr uint8_t HOSYOND_FT6336_TOUCHES_REG = 0x02;
+static constexpr uint8_t HOSYOND_FT6336_TOUCH_XH_REG = 0x03;
 
 inline bool hosyondI2CInit() {
   static bool ready = false;
@@ -234,7 +236,7 @@ public:
     auto bus_cfg = _bus.config();
     bus_cfg.spi_host = SPI2_HOST;
     bus_cfg.spi_mode = 0;
-    bus_cfg.freq_write = 80000000;
+    bus_cfg.freq_write = 40000000;
     bus_cfg.freq_read = 20000000;
     bus_cfg.spi_3wire = false;
     bus_cfg.use_lock = true;
@@ -346,11 +348,77 @@ private:
   uint32_t _pressedAt = 0;
 };
 
-class TouchButton_Compat {
+class HosyondTouch_Compat {
 public:
   void begin() {
     pinMode(HOSYOND_TOUCH_INT, INPUT_PULLUP);
     hosyondI2CInit();
+  }
+
+  void update(uint32_t = millis()) {
+    _pressed = false;
+    _orientedX = 0;
+    if (!hosyondI2CInit()) return;
+
+    uint8_t reg = HOSYOND_FT6336_TOUCHES_REG;
+    uint8_t touches = 0;
+    esp_err_t err = i2c_master_write_read_device(
+      I2C_NUM_0,
+      HOSYOND_FT6336_ADDR,
+      &reg,
+      1,
+      &touches,
+      1,
+      pdMS_TO_TICKS(5)
+    );
+    if (err != ESP_OK) return;
+
+    touches &= 0x0F;
+    if (touches == 0 || touches > 2) return;
+
+    reg = HOSYOND_FT6336_TOUCH_XH_REG;
+    uint8_t data[4] = {0};
+    err = i2c_master_write_read_device(
+      I2C_NUM_0,
+      HOSYOND_FT6336_ADDR,
+      &reg,
+      1,
+      data,
+      sizeof(data),
+      pdMS_TO_TICKS(5)
+    );
+    if (err != ESP_OK) return;
+
+    uint16_t rawX = ((uint16_t)(data[0] & 0x0F) << 8) | data[1];
+    if (rawX >= HOSYOND_TOUCH_PHYSICAL_W) rawX = HOSYOND_TOUCH_PHYSICAL_W - 1;
+
+    // The LCD is rotated 180 degrees to match the board enclosure, while the
+    // FT6336 reports panel-native coordinates. Mirror X so left/right match
+    // the visible portrait UI.
+    _orientedX = HOSYOND_TOUCH_PHYSICAL_W - 1 - rawX;
+    _pressed = true;
+  }
+
+  bool leftPressed() const { return _pressed && _orientedX < HOSYOND_TOUCH_PHYSICAL_W / 2; }
+  bool rightPressed() const { return _pressed && _orientedX >= HOSYOND_TOUCH_PHYSICAL_W / 2; }
+
+private:
+  bool _pressed = false;
+  uint16_t _orientedX = 0;
+};
+
+inline HosyondTouch_Compat hosyondTouch;
+
+enum class HosyondTouchZone {
+  Left,
+  Right,
+};
+
+class TouchZoneButton_Compat {
+public:
+  explicit TouchZoneButton_Compat(HosyondTouchZone zone = HosyondTouchZone::Left) : _zone(zone) {}
+
+  void begin() {
     _lastRaw = rawPressed();
     _stable = _lastRaw;
   }
@@ -396,23 +464,10 @@ public:
 
 private:
   bool rawPressed() const {
-    if (!hosyondI2CInit()) return false;
-    uint8_t reg = HOSYOND_FT6336_TOUCHES_REG;
-    uint8_t touches = 0;
-    esp_err_t err = i2c_master_write_read_device(
-      I2C_NUM_0,
-      HOSYOND_FT6336_ADDR,
-      &reg,
-      1,
-      &touches,
-      1,
-      pdMS_TO_TICKS(5)
-    );
-    if (err != ESP_OK) return false;
-    touches &= 0x0F;
-    return touches > 0 && touches <= 2;
+    return _zone == HosyondTouchZone::Left ? hosyondTouch.leftPressed() : hosyondTouch.rightPressed();
   }
 
+  HosyondTouchZone _zone;
   bool _lastRaw = false;
   bool _stable = false;
   bool _released = false;
@@ -595,8 +650,8 @@ public:
   HosyondGFX Lcd;
   IMU_Compat Imu;
   RTC_Compat Rtc;
-  TouchButton_Compat BtnA;
-  Button_Compat BtnB = Button_Compat(HOSYOND_BTN_A, true);
+  TouchZoneButton_Compat BtnA = TouchZoneButton_Compat(HosyondTouchZone::Left);
+  TouchZoneButton_Compat BtnB = TouchZoneButton_Compat(HosyondTouchZone::Right);
   Button_Compat BtnPWR = Button_Compat(-1, true);
   Mic_Compat Mic;
   AXP192_Compat Axp;
@@ -611,6 +666,7 @@ public:
     digitalWrite(HOSYOND_TOUCH_RST, HIGH);
     pinMode(HOSYOND_BAT_ADC, INPUT);
     analogReadResolution(12);
+    hosyondTouch.begin();
     BtnA.begin();
     BtnB.begin();
     Lcd.init();
@@ -622,6 +678,7 @@ public:
 
   void update() {
     uint32_t now = millis();
+    hosyondTouch.update(now);
     BtnA.update(now);
     BtnB.update(now);
   }

@@ -15,6 +15,16 @@ extern bool buddyMode;
 #define HERMES_DISPLAY_X_OFFSET 0
 #endif
 
+inline void setupPushPortraitSprite() {
+  if (HERMES_DISPLAY_X_OFFSET > 0) {
+    int rightX = HERMES_DISPLAY_X_OFFSET + W;
+    int rightW = M5.Lcd.width() - rightX;
+    M5.Lcd.fillRect(0, 0, HERMES_DISPLAY_X_OFFSET, H, 0x0000);
+    if (rightW > 0) M5.Lcd.fillRect(rightX, 0, rightW, H, 0x0000);
+  }
+  spr.pushSprite(HERMES_DISPLAY_X_OFFSET, 0);
+}
+
 enum SetupPersonaState { 
   SETUP_P_SLEEP, 
   SETUP_P_IDLE, 
@@ -32,7 +42,7 @@ inline void runSetupWizard() {
   spr.setTextSize(1);
   spr.setTextColor(0xFFFF, 0x0842);
   spr.drawString("Scanning Wi-Fi...", W / 2, H / 2);
-  spr.pushSprite(HERMES_DISPLAY_X_OFFSET, 0);
+  setupPushPortraitSprite();
 
   // Scan networks
   WiFi.mode(WIFI_STA);
@@ -586,7 +596,7 @@ inline void runSetupWizard() {
         spr.fillCircle(10, 227, 4, dotCol);
       }
       
-      spr.pushSprite(HERMES_DISPLAY_X_OFFSET, 0);
+      setupPushPortraitSprite();
     }
     
     if (shouldReboot && millis() > rebootTime) {
