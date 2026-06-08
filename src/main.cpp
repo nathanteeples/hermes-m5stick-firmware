@@ -44,12 +44,23 @@ static void startBt() {
 
 #include "character.h"
 #include "stats.h"
-const int W = 135, H = 240;
+#ifndef HERMES_DISPLAY_W
+#define HERMES_DISPLAY_W 135
+#endif
+#ifndef HERMES_DISPLAY_H
+#define HERMES_DISPLAY_H 240
+#endif
+const int W = HERMES_DISPLAY_W, H = HERMES_DISPLAY_H;
 const int CX = W / 2;
 const int CY_BASE = 120;
-const int LED_PIN = 19;          // red LED, active-high
+#ifndef HERMES_LED_PIN
+#define HERMES_LED_PIN 19
+#endif
+const int LED_PIN = HERMES_LED_PIN;          // status LED, active-high
 
 // Colors used across multiple UI surfaces
+const uint16_t HB_RED   = 0xF800;
+const uint16_t HB_GREEN = 0x07E0;
 const uint16_t HOT   = 0xFA20;   // red-orange: warnings, impatience, deny
 const uint16_t PANEL = 0x2104;   // overlay panel background
 
@@ -116,7 +127,10 @@ bool     gifAvailable = false;
 const uint8_t SPECIES_GIF = 0xFF;   // species NVS sentinel: use the installed GIF
 
 // Voice recording
-#define REC_SAMPLE_RATE   8000
+#ifndef HERMES_RECORD_SAMPLE_RATE
+#define HERMES_RECORD_SAMPLE_RATE 8000
+#endif
+#define REC_SAMPLE_RATE   HERMES_RECORD_SAMPLE_RATE
 #define REC_BUF_SAMPLES   (REC_SAMPLE_RATE * 4)   // 4 seconds (64KB DRAM)
 #define REC_MAX_MS         4000  // auto-stop after 4s
 int16_t* volatile recBuffer = nullptr;
@@ -335,10 +349,10 @@ static void drawSettings() {
     if (i == 0) {
       spr.printf("%u/4", brightLevel);
     } else if (i == 1) {
-      spr.setTextColor(s.sound ? GREEN : p.textDim, PANEL);
+      spr.setTextColor(s.sound ? HB_GREEN : p.textDim, PANEL);
       spr.print(s.sound ? " on" : "off");
     } else if (i == 4) {
-      spr.setTextColor(s.led ? GREEN : p.textDim, PANEL);
+      spr.setTextColor(s.led ? HB_GREEN : p.textDim, PANEL);
       spr.print(s.led ? " on" : "off");
     } else if (i == 5) {
       static const char* const RN[] = { "auto", "port", "land" };
@@ -984,7 +998,7 @@ void drawInfo() {
     
     // Status indicator
     bool conn = tama.connected;
-    spr.fillCircle(12, y + 6, 4, conn ? GREEN : RED);
+    spr.fillCircle(12, y + 6, 4, conn ? HB_GREEN : HB_RED);
     spr.setTextColor(p.text, p.bg);
     spr.setCursor(22, y + 2);
     spr.print(conn ? "Connected" : "Disconnected");
@@ -1078,7 +1092,7 @@ void drawInfo() {
     spr.drawRect(bx, by, bw, bh, p.text);
     spr.fillRect(bx + bw, by + 3, 2, 6, p.text); // battery tip
     int fillW = (pct * (bw - 4)) / 100;
-    uint16_t batCol = full ? GREEN : (charging ? 0xFFE0 : (pct < 20 ? HOT : p.body));
+    uint16_t batCol = full ? HB_GREEN : (charging ? 0xFFE0 : (pct < 20 ? HOT : p.body));
     if (fillW > 0) {
       spr.fillRect(bx + 2, by + 2, fillW, bh - 4, batCol);
     }
@@ -1095,7 +1109,7 @@ void drawInfo() {
     spr.setCursor(bx + bw + 8, by + 2);
     spr.printf("%d%%", pct);
     
-    spr.setTextColor(full ? GREEN : (charging ? 0xFFE0 : p.textDim), p.bg);
+    spr.setTextColor(full ? HB_GREEN : (charging ? 0xFFE0 : p.textDim), p.bg);
     spr.setCursor(bx + bw + 42, by + 2);
     spr.print(full ? "Full" : (charging ? "Charging" : (usb ? "USB" : "Battery")));
     
@@ -1135,7 +1149,7 @@ void drawInfo() {
     spr.setTextColor(p.textDim, p.bg);
     spr.setCursor(12, rowY);
     spr.print("Hermes:");
-    spr.setTextColor(dataConnected() ? GREEN : HOT, p.bg);
+    spr.setTextColor(dataConnected() ? HB_GREEN : HOT, p.bg);
     const char* gwStatus = dataConnected() ? "online" : "offline";
     spr.setCursor(W - 16 - strlen(gwStatus)*6, rowY);
     spr.print(gwStatus);
@@ -1147,7 +1161,7 @@ void drawInfo() {
 
     // Draw Wi-Fi Icon
     int wx = 18, wy = y + 10;
-    uint16_t wifiCol = connected ? GREEN : HOT;
+    uint16_t wifiCol = connected ? HB_GREEN : HOT;
     spr.fillCircle(wx, wy, 2, wifiCol);
     spr.drawArc(wx, wy, 4, 5, 225, 315, wifiCol);
     spr.drawArc(wx, wy, 8, 9, 225, 315, wifiCol);
@@ -1155,7 +1169,7 @@ void drawInfo() {
     
     // Status text
     spr.setTextSize(1);
-    spr.setTextColor(connected ? GREEN : HOT, p.bg);
+    spr.setTextColor(connected ? HB_GREEN : HOT, p.bg);
     spr.setCursor(wx + 22, wy - 4);
     spr.print(connected ? "Connected" : "Offline");
     
@@ -1251,7 +1265,7 @@ void drawInfo() {
     centeredLn(p.text, "Syax89", 14);
     
     // Draw a small red heart!
-    tinyHeart(W / 2, cardY + 2, true, RED);
+    tinyHeart(W / 2, cardY + 2, true, HB_RED);
     cardY += 12;
     
     centeredLn(p.textDim, "Firmware Version", 12);
@@ -1636,7 +1650,7 @@ static void drawApproval() {
     spr.setCursor(4, H - 12);
     spr.print("sent...");
   } else {
-    spr.setTextColor(GREEN, p.bg);
+    spr.setTextColor(HB_GREEN, p.bg);
     spr.setCursor(4, H - 12);
     spr.print("A: approve");
     spr.setTextColor(HOT, p.bg);
@@ -1683,7 +1697,7 @@ static void drawPetStats(const Palette& p, int y) {
   spr.setCursor(14, rowY);
   spr.print("Mood:");
   uint8_t mood = statsMoodTier();
-  uint16_t moodCol = (mood >= 3) ? RED : (mood >= 2) ? HOT : p.textDim;
+  uint16_t moodCol = (mood >= 3) ? HB_RED : (mood >= 2) ? HOT : p.textDim;
   for (int i = 0; i < 4; i++) {
     tinyHeart((W - 52) + i * 12, rowY + 4, i < mood, moodCol);
   }
@@ -1706,7 +1720,7 @@ static void drawPetStats(const Palette& p, int y) {
   spr.setCursor(14, rowY);
   spr.print("Energy:");
   uint8_t en = statsEnergyTier();
-  uint16_t enCol = (en >= 4) ? GREEN : (en >= 2) ? 0xFFE0 : HOT;
+  uint16_t enCol = (en >= 4) ? HB_GREEN : (en >= 2) ? 0xFFE0 : HOT;
   for (int i = 0; i < 5; i++) {
     int px = (W - 60) + i * 10;
     if (i < en) spr.fillRect(px, rowY + 1, 8, 6, enCol);

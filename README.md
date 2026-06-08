@@ -1,6 +1,6 @@
 # Hermes M5Stick Firmware
 
-Firmware for **M5StickC Plus 2** — a physical companion device that connects to **Hermes Agent** over Wi-Fi, displaying session status, token usage, and allowing voice input via the built-in microphone.
+Firmware for **M5StickC Plus 2** and the **Hosyond/QDTech ES3C28P 2.8-inch ESP32-S3 ILI9341V display board** — a physical companion device that connects to **Hermes Agent** over Wi-Fi, displaying session status, token usage, and allowing voice input via the built-in microphone/audio codec.
 
 This is a fork of [anthropics/claude-desktop-buddy](https://github.com/anthropics/claude-desktop-buddy), adapted to work with the Hermes Agent API instead of the original Claude Bluetooth API. The original project is MIT-licensed by Anthropic, PBC.
 
@@ -75,7 +75,7 @@ M5Stick Mic -> Groq STT (whisper-large-v3-turbo) -> Hermes Chat -> Response on d
 
 ## Requirements
 
-- **Hardware**: M5StickC Plus 2 (with PDM microphone and speaker)
+- **Hardware**: M5StickC Plus 2, or Hosyond/QDTech ES3C28P 2.8-inch ESP32-S3 board
 - **Software**: [PlatformIO Core](https://docs.platformio.org/en/latest/core/installation/) (`pip install platformio`)
 - **Backend**: Hermes Agent with API server enabled + **Groq API key** for voice STT
 
@@ -106,6 +106,8 @@ M5Stick Mic -> Groq STT (whisper-large-v3-turbo) -> Hermes Chat -> Response on d
    ```bash
    pio pkg install
    pio run --environment m5stickc-plus
+   # or, for the Hosyond/QDTech 2.8-inch ESP32-S3 board:
+   pio run --environment hosyond-es3c28p
    ```
 
    > If `pio` is not found in your system's PATH, use `python3 -m platformio` instead:
@@ -117,6 +119,8 @@ M5Stick Mic -> Groq STT (whisper-large-v3-turbo) -> Hermes Chat -> Response on d
 3. Upload firmware via USB:
    ```bash
    pio run --environment m5stickc-plus -t upload
+   # or:
+   pio run --environment hosyond-es3c28p -t upload
    ```
 
    Or if using the Python module:
