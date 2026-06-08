@@ -53,12 +53,26 @@ static void gifPlace() {
   gifX = (spr.width() - outW) / 2;
   gifY = peekMode ? (PEEK_TOP - outH) / 2 : (140 - outH) / 2;
 }
+
+static void clearGifCanvas() {
+  int outW = peekMode ? gifW / 2 : gifW;
+  int outH = peekMode ? gifH / 2 : gifH;
+  int x = gifX;
+  int y = gifY;
+  if (x < 0) { outW += x; x = 0; }
+  if (y < 0) { outH += y; y = 0; }
+  if (x + outW > spr.width()) outW = spr.width() - x;
+  int maxH = peekMode ? PEEK_TOP : spr.height();
+  if (y + outH > maxH) outH = maxH - y;
+  if (outW > 0 && outH > 0) _tgt->fillRect(x, y, outW, outH, pal.bg);
+}
 static uint32_t    nextFrameAt = 0;
 static uint32_t    animPauseUntil = 0;
 static uint32_t    variantStartedMs = 0;
 static const uint32_t VARIANT_DWELL_MS = 5000;
 static const uint32_t ANIM_PAUSE_MS    = 800;
 static bool        gifOpen = false;
+static bool        gifFrameCleared = false;
 
 static uint16_t parseHexColor(const char* s, uint16_t fallback) {
   if (!s) return fallback;
@@ -100,6 +114,11 @@ static int32_t gifSeekCb(GIFFILE* pFile, int32_t iPosition) {
 // paints its region — no ghosting from prior frames.
 
 static void gifDrawCb(GIFDRAW* d) {
+  if (_tgt == &spr && !gifFrameCleared) {
+    clearGifCanvas();
+    gifFrameCleared = true;
+  }
+
   uint16_t* pal16 = d->pPalette;
   uint8_t*  src   = d->pPixels;
   uint8_t   t     = d->ucTransparent;
@@ -369,6 +388,7 @@ void characterTick() {
   if (now < nextFrameAt) return;
 
   int delayMs = 0;
+  gifFrameCleared = false;
   if (!gif.playFrame(false, &delayMs)) {
     // End of animation. Single-gif states freeze on the last frame instead
     // of reopening — the LittleFS open + GIF header decode is a multi-ms

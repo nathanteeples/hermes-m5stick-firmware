@@ -214,8 +214,10 @@ void buddyTick(uint8_t personaState) {
   lastDrawnState = personaState;
   lastDrawnSpecies = currentSpeciesIdx;
 
-  // Clear the whole render strip — at 2× the body reaches y≈126, at 1× ≈82.
-  spr.fillRect(0, 0, BUDDY_CANVAS_W,
+  // Clear the whole render strip. The Hosyond viewport is wider than the
+  // original M5 canvas, and drifting particles can otherwise leave pixels
+  // outside the old 135px strip.
+  spr.fillRect(0, 0, spr.width(),
                (BUDDY_Y_BASE + 5 * BUDDY_CHAR_H + 12) * _scale, BUDDY_BG);
 
   const Species* sp = SPECIES_TABLE[currentSpeciesIdx];

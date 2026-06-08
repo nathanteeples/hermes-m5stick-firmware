@@ -392,10 +392,7 @@ public:
     uint16_t rawX = ((uint16_t)(data[0] & 0x0F) << 8) | data[1];
     if (rawX >= HOSYOND_TOUCH_PHYSICAL_W) rawX = HOSYOND_TOUCH_PHYSICAL_W - 1;
 
-    // The LCD is rotated 180 degrees to match the board enclosure, while the
-    // FT6336 reports panel-native coordinates. Mirror X so left/right match
-    // the visible portrait UI.
-    _orientedX = HOSYOND_TOUCH_PHYSICAL_W - 1 - rawX;
+    _orientedX = rawX;
     _pressed = true;
   }
 
@@ -508,11 +505,85 @@ public:
   bool getAccelData(float*, float*, float*) { return false; }
 };
 
+inline bool hosyondAudioInit() {
+  static bool ready = false;
+  if (ready) return true;
+  if (!hosyondI2CInit()) return false;
+
+  pinMode(HOSYOND_AP_ENABLE, OUTPUT);
+  digitalWrite(HOSYOND_AP_ENABLE, LOW);
+
+  i2s_config_t i2s_cfg = {
+    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX),
+    .sample_rate = EXAMPLE_SAMPLE_RATE,
+    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
+    .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
+    .communication_format = I2S_COMM_FORMAT_STAND_I2S,
+    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+    .dma_buf_count = 8,
+    .dma_buf_len = 256,
+    .use_apll = false,
+    .tx_desc_auto_clear = true,
+    .fixed_mclk = EXAMPLE_MCLK_FREQ_HZ,
+  };
+
+  esp_err_t err = i2s_driver_install(I2S_NUM_1, &i2s_cfg, 0, nullptr);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return false;
+
+  i2s_pin_config_t pin_cfg = {
+    .mck_io_num = HOSYOND_I2S_MCK,
+    .bck_io_num = HOSYOND_I2S_BCK,
+    .ws_io_num = HOSYOND_I2S_WS,
+    .data_out_num = HOSYOND_I2S_DOUT,
+    .data_in_num = HOSYOND_I2S_DIN,
+  };
+  err = i2s_set_pin(I2S_NUM_1, &pin_cfg);
+  if (err != ESP_OK) return false;
+
+  err = es8311_codec_init();
+  if (err != ESP_OK) return false;
+
+  i2s_zero_dma_buffer(I2S_NUM_1);
+  ready = true;
+  return true;
+}
+
 class Beep_Compat {
 public:
-  void begin() {}
+  void begin() {
+    hosyondAudioInit();
+  }
   void update() {}
-  void tone(uint16_t, uint16_t) {}
+
+  void tone(uint16_t freq, uint16_t dur) {
+    if (freq == 0 || dur == 0 || !hosyondAudioInit()) return;
+
+    static uint32_t phase = 0;
+    constexpr size_t CHUNK_FRAMES = 128;
+    int16_t samples[CHUNK_FRAMES * 2];
+    uint32_t total = ((uint32_t)EXAMPLE_SAMPLE_RATE * dur) / 1000;
+    uint32_t step = ((uint32_t)freq << 16) / EXAMPLE_SAMPLE_RATE;
+
+    while (total > 0) {
+      size_t frames = total > CHUNK_FRAMES ? CHUNK_FRAMES : total;
+      for (size_t i = 0; i < frames; i++) {
+        phase += step;
+        int16_t v = (phase & 0x8000) ? 5000 : -5000;
+        samples[i * 2] = v;
+        samples[i * 2 + 1] = v;
+      }
+      size_t bytesWritten = 0;
+      i2s_write(I2S_NUM_1, samples, frames * 2 * sizeof(int16_t), &bytesWritten, pdMS_TO_TICKS(dur + 20));
+      total -= frames;
+    }
+
+    for (size_t i = 0; i < 32; i++) {
+      samples[i * 2] = 0;
+      samples[i * 2 + 1] = 0;
+    }
+    size_t bytesWritten = 0;
+    i2s_write(I2S_NUM_1, samples, 32 * 2 * sizeof(int16_t), &bytesWritten, pdMS_TO_TICKS(20));
+  }
 };
 
 class AXP192_Compat {
@@ -531,21 +602,28 @@ public:
   }
 
   float GetBatVoltage() {
-    return (float)(analogReadMilliVolts(HOSYOND_BAT_ADC) * 2) / 1000.0f;
+    return readBatteryMilliVolts() / 1000.0f;
   }
 
   float GetBatCurrent() { return 0.0f; }
 
   int GetBatLevel() {
-    int mv = analogReadMilliVolts(HOSYOND_BAT_ADC) * 2;
-    if (mv <= 3300) return 0;
+    int mv = readBatteryMilliVolts();
+    if (mv <= 2500) return 0;
     if (mv >= 4200) return 100;
-    return (mv - 3300) * 100 / 900;
+    return (mv - 2500) / 17;
   }
 
   float GetVBusVoltage() { return 0.0f; }
   float GetTempInAXP192() { return -999.0f; }
   uint8_t GetBtnPress() { return 0; }
+
+private:
+  int readBatteryMilliVolts() const {
+    uint32_t sum = 0;
+    for (uint8_t i = 0; i < 8; i++) sum += analogReadMilliVolts(HOSYOND_BAT_ADC);
+    return (int)((sum / 8) * 2);
+  }
 };
 
 class Mic_Compat {
@@ -559,41 +637,7 @@ public:
 
   bool begin() {
     if (_begun) return true;
-    if (!hosyondI2CInit()) return false;
-
-    pinMode(HOSYOND_AP_ENABLE, OUTPUT);
-    digitalWrite(HOSYOND_AP_ENABLE, LOW);
-
-    i2s_config_t i2s_cfg = {
-      .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX),
-      .sample_rate = EXAMPLE_SAMPLE_RATE,
-      .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-      .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
-      .communication_format = I2S_COMM_FORMAT_STAND_I2S,
-      .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-      .dma_buf_count = 8,
-      .dma_buf_len = 256,
-      .use_apll = false,
-      .tx_desc_auto_clear = true,
-      .fixed_mclk = EXAMPLE_MCLK_FREQ_HZ,
-    };
-
-    esp_err_t err = i2s_driver_install(I2S_NUM_1, &i2s_cfg, 0, nullptr);
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return false;
-
-    i2s_pin_config_t pin_cfg = {
-      .mck_io_num = HOSYOND_I2S_MCK,
-      .bck_io_num = HOSYOND_I2S_BCK,
-      .ws_io_num = HOSYOND_I2S_WS,
-      .data_out_num = HOSYOND_I2S_DOUT,
-      .data_in_num = HOSYOND_I2S_DIN,
-    };
-    err = i2s_set_pin(I2S_NUM_1, &pin_cfg);
-    if (err != ESP_OK) return false;
-    err = es8311_codec_init();
-    if (err != ESP_OK) return false;
-    i2s_zero_dma_buffer(I2S_NUM_1);
-
+    if (!hosyondAudioInit()) return false;
     _begun = true;
     return true;
   }
@@ -666,6 +710,7 @@ public:
     digitalWrite(HOSYOND_TOUCH_RST, HIGH);
     pinMode(HOSYOND_BAT_ADC, INPUT);
     analogReadResolution(12);
+    analogSetPinAttenuation(HOSYOND_BAT_ADC, ADC_11db);
     hosyondTouch.begin();
     BtnA.begin();
     BtnB.begin();

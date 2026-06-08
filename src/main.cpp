@@ -3,6 +3,9 @@
 #include <cmath>
 #include <stdarg.h>
 #include <esp_system.h>
+#ifdef HERMES_BOARD_HOSYOND_ES3C28P
+#include <esp32-hal-rgb-led.h>
+#endif
 #include "ble_bridge.h"
 #include "data.h"
 #include "buddy.h"
@@ -61,6 +64,23 @@ const int CY_BASE = 120;
 #define HERMES_LED_PIN 19
 #endif
 const int LED_PIN = HERMES_LED_PIN;          // status LED, active-high
+
+static void statusLedBegin() {
+#ifdef HERMES_BOARD_HOSYOND_ES3C28P
+  neopixelWrite(LED_PIN, 0, 0, 0);
+#else
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+#endif
+}
+
+static void statusLedWrite(bool on) {
+#ifdef HERMES_BOARD_HOSYOND_ES3C28P
+  neopixelWrite(LED_PIN, on ? 32 : 0, on ? 8 : 0, 0);
+#else
+  digitalWrite(LED_PIN, on ? HIGH : LOW);
+#endif
+}
 
 // Colors used across multiple UI surfaces
 const uint16_t HB_RED   = 0xF800;
@@ -2114,8 +2134,7 @@ void setup() {
   M5.Mic.begin();
   Serial.printf("Mic gain=%u\n", M5.Mic.config().magnification);
   startBt();
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);   // off
+  statusLedBegin();
   applyBrightness();
   lastInteractMs = millis();
 
@@ -2288,9 +2307,9 @@ void loop() {
   // LED: pulse on active prompt or attention state, otherwise off
   bool promptActive = (tama.promptId[0] && !responseSent);
   if ((activeState == P_ATTENTION || promptActive) && settings().led) {
-    digitalWrite(LED_PIN, (now / 400) % 2 ? HIGH : LOW);
+    statusLedWrite((now / 400) % 2);
   } else {
-    digitalWrite(LED_PIN, LOW);
+    statusLedWrite(false);
   }
 
   // shake → dizzy + force scenario advance
