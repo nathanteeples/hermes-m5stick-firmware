@@ -397,6 +397,7 @@ inline void statsGetSnapshot(Stats* out) {
 
 struct Settings {
   bool sound;
+  uint8_t soundVolume;
   bool led;
   uint8_t clockRot;  // 0=auto 1=portrait 2=landscape
   char hermesIp[64];
@@ -408,12 +409,14 @@ struct Settings {
   bool configured;
 };
 
-static Settings _settings = { true, true, 0, "192.168.1.100", 8642, "", "", "", "", false };
+static Settings _settings = { true, 2, true, 0, "192.168.1.100", 8642, "", "", "", "", false };
 
 inline void settingsLoad() {
   if (nvsMutex && xSemaphoreTake(nvsMutex, portMAX_DELAY) == pdTRUE) {
     _prefs.begin("buddy", true);
     _settings.sound = _prefs.getBool("s_snd", true);
+    _settings.soundVolume = _prefs.getUChar("s_vol", 2);
+    if (_settings.soundVolume > 4) _settings.soundVolume = 4;
     _settings.led   = _prefs.getBool("s_led", true);
     _settings.clockRot = _prefs.getUChar("s_crot", 0);
     if (_settings.clockRot > 2) _settings.clockRot = 0;
@@ -434,6 +437,7 @@ inline void settingsSave() {
   if (nvsMutex && xSemaphoreTake(nvsMutex, portMAX_DELAY) == pdTRUE) {
     _prefs.begin("buddy", false);
     _prefs.putBool("s_snd", _settings.sound);
+    _prefs.putUChar("s_vol", _settings.soundVolume);
     _prefs.putBool("s_led", _settings.led);
     _prefs.putUChar("s_crot", _settings.clockRot);
     _prefs.putString("s_ip", _settings.hermesIp);

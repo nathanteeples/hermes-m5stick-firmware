@@ -69,7 +69,7 @@ class Beep_Compat {
 public:
   void begin() {}
   void update() {}
-  void tone(uint16_t freq, uint16_t dur) {
+  void tone(uint16_t freq, uint16_t dur, uint8_t = 2) {
     ::M5.Speaker.tone(freq, dur);
   }
 };
@@ -555,25 +555,43 @@ public:
   }
   void update() {}
 
-  void tone(uint16_t freq, uint16_t dur) {
-    if (freq == 0 || dur == 0 || !hosyondAudioInit()) return;
+  void tone(uint16_t freq, uint16_t dur, uint8_t volume = 2) {
+    if (freq == 0 || dur == 0 || volume == 0 || !hosyondAudioInit()) return;
 
-    static uint32_t phase = 0;
+    static float phase = 0.0f;
+    static uint32_t lastToneEnd = 0;
     constexpr size_t CHUNK_FRAMES = 128;
     int16_t samples[CHUNK_FRAMES * 2];
     uint32_t total = ((uint32_t)EXAMPLE_SAMPLE_RATE * dur) / 1000;
-    uint32_t step = ((uint32_t)freq << 16) / EXAMPLE_SAMPLE_RATE;
+    uint32_t done = 0;
+    const uint32_t fade = total < 160 ? total / 2 : 80;
+    const uint16_t ampByVolume[5] = { 0, 550, 950, 1500, 2300 };
+    float amp = ampByVolume[volume > 4 ? 4 : volume];
+    float step = 6.2831853f * (float)freq / (float)EXAMPLE_SAMPLE_RATE;
+
+    if (millis() - lastToneEnd > 25) phase = 0.0f;
+    i2s_zero_dma_buffer(I2S_NUM_1);
 
     while (total > 0) {
       size_t frames = total > CHUNK_FRAMES ? CHUNK_FRAMES : total;
       for (size_t i = 0; i < frames; i++) {
+        float env = 1.0f;
+        uint32_t pos = done + i;
+        if (fade > 0 && pos < fade) env = (float)pos / (float)fade;
+        uint32_t remain = total - i;
+        if (fade > 0 && remain < fade) {
+          float outEnv = (float)remain / (float)fade;
+          if (outEnv < env) env = outEnv;
+        }
         phase += step;
-        int16_t v = (phase & 0x8000) ? 5000 : -5000;
+        if (phase >= 6.2831853f) phase -= 6.2831853f;
+        int16_t v = (int16_t)(sinf(phase) * amp * env);
         samples[i * 2] = v;
         samples[i * 2 + 1] = v;
       }
       size_t bytesWritten = 0;
       i2s_write(I2S_NUM_1, samples, frames * 2 * sizeof(int16_t), &bytesWritten, pdMS_TO_TICKS(dur + 20));
+      done += frames;
       total -= frames;
     }
 
@@ -583,6 +601,7 @@ public:
     }
     size_t bytesWritten = 0;
     i2s_write(I2S_NUM_1, samples, 32 * 2 * sizeof(int16_t), &bytesWritten, pdMS_TO_TICKS(20));
+    lastToneEnd = millis();
   }
 };
 

@@ -4,7 +4,7 @@
 #include <stdarg.h>
 #include <esp_system.h>
 #ifdef HERMES_BOARD_HOSYOND_ES3C28P
-#include <esp32-hal-rgb-led.h>
+#include <esp32-hal-rmt.h>
 #endif
 #include "ble_bridge.h"
 #include "data.h"
@@ -65,9 +65,11 @@ const int CY_BASE = 120;
 #endif
 const int LED_PIN = HERMES_LED_PIN;          // status LED, active-high
 
+static void statusLedWrite(bool on);
+
 static void statusLedBegin() {
 #ifdef HERMES_BOARD_HOSYOND_ES3C28P
-  neopixelWrite(LED_PIN, 0, 0, 0);
+  statusLedWrite(false);
 #else
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
@@ -76,7 +78,31 @@ static void statusLedBegin() {
 
 static void statusLedWrite(bool on) {
 #ifdef HERMES_BOARD_HOSYOND_ES3C28P
-  neopixelWrite(LED_PIN, on ? 32 : 0, on ? 8 : 0, 0);
+  static rmt_obj_t* rmt = nullptr;
+  if (!rmt) {
+    rmt = rmtInit(LED_PIN, RMT_TX_MODE, RMT_MEM_64);
+    if (!rmt) return;
+    rmtSetTick(rmt, 100);
+  }
+
+  uint8_t green = on ? 12 : 0;
+  uint8_t red = on ? 36 : 0;
+  uint8_t blue = 0;
+  uint8_t white = 0;
+  uint8_t color[4] = { green, red, blue, white };
+  rmt_data_t data[32];
+  int out = 0;
+  for (uint8_t c = 0; c < 4; c++) {
+    for (uint8_t bit = 0; bit < 8; bit++) {
+      bool high = color[c] & (1 << (7 - bit));
+      data[out].level0 = 1;
+      data[out].duration0 = high ? 8 : 4;
+      data[out].level1 = 0;
+      data[out].duration1 = high ? 4 : 8;
+      out++;
+    }
+  }
+  rmtWriteBlocking(rmt, data, 32);
 #else
   digitalWrite(LED_PIN, on ? HIGH : LOW);
 #endif
@@ -238,7 +264,7 @@ static void wake() {
 bool     responseSent = false;
 
 static void beep(uint16_t freq, uint16_t dur) {
-  if (settings().sound) M5.Beep.tone(freq, dur);
+  if (settings().sound) M5.Beep.tone(freq, dur, settings().soundVolume);
 }
 
 const uint8_t INFO_PAGES = 6;
@@ -267,8 +293,8 @@ static uint8_t menuCount() {
 
 bool    settingsOpen = false;
 uint8_t settingsSel  = 0;
-const char* settingsItems[] = { "brightness", "sound", "wifi info", "hermes info", "led", "clock rot", "ascii pet", "sessions", "reset", "back" };
-const uint8_t SETTINGS_N = 10;
+const char* settingsItems[] = { "brightness", "sound", "volume", "wifi info", "hermes info", "led", "clock rot", "ascii pet", "sessions", "reset", "back" };
+const uint8_t SETTINGS_N = 11;
 
 bool    resetOpen = false;
 uint8_t resetSel  = 0;
@@ -290,26 +316,27 @@ static void applySetting(uint8_t idx) {
       applyBrightness();
       return;
     case 1: s.sound = !s.sound; break;
-    case 2:
+    case 2: s.soundVolume = (s.soundVolume + 1) % 5; break;
+    case 3:
       settingsOpen = false;
       displayMode = DISP_INFO;
       infoPage = 4; // wifi page
       applyDisplayMode();
       characterInvalidate();
       return;
-    case 3:
+    case 4:
       settingsOpen = false;
       displayMode = DISP_INFO;
       infoPage = 2; // hermes page
       applyDisplayMode();
       characterInvalidate();
       return;
-    case 4: s.led = !s.led; break;
-    case 5: s.clockRot = (s.clockRot + 1) % 3; break;
-    case 6: nextPet(); return;
-    case 7: settingsOpen = false; sessionsOpen = true; sessScroll = 0; return;
-    case 8: resetOpen = true; resetSel = 0; spr.fillSprite(0x0000); return;
-    case 9: settingsOpen = false; characterInvalidate(); return;
+    case 5: s.led = !s.led; break;
+    case 6: s.clockRot = (s.clockRot + 1) % 3; break;
+    case 7: nextPet(); return;
+    case 8: settingsOpen = false; sessionsOpen = true; sessScroll = 0; return;
+    case 9: resetOpen = true; resetSel = 0; spr.fillSprite(0x0000); return;
+    case 10: settingsOpen = false; characterInvalidate(); return;
   }
   settingsSave();
 }
@@ -385,13 +412,15 @@ static void drawSettings() {
     } else if (i == 1) {
       spr.setTextColor(s.sound ? HB_GREEN : p.textDim, PANEL);
       spr.print(s.sound ? " on" : "off");
-    } else if (i == 4) {
+    } else if (i == 2) {
+      spr.printf("%u/4", s.soundVolume);
+    } else if (i == 5) {
       spr.setTextColor(s.led ? HB_GREEN : p.textDim, PANEL);
       spr.print(s.led ? " on" : "off");
-    } else if (i == 5) {
+    } else if (i == 6) {
       static const char* const RN[] = { "auto", "port", "land" };
       spr.print(RN[s.clockRot]);
-    } else if (i == 6) {
+    } else if (i == 7) {
       uint8_t total = buddySpeciesCount() + (gifAvailable ? 1 : 0);
       uint8_t pos   = buddyMode ? buddySpeciesIdx() + 1 : total;
       spr.printf("%u/%u", pos, total);
@@ -2177,9 +2206,9 @@ void setup() {
     
     // Play a cool high-tech startup chirp!
     if (settings().sound) {
-      M5.Beep.tone(800, 50); delay(50);
-      M5.Beep.tone(1200, 50); delay(50);
-      M5.Beep.tone(1600, 100);
+      M5.Beep.tone(800, 50, settings().soundVolume); delay(50);
+      M5.Beep.tone(1200, 50, settings().soundVolume); delay(50);
+      M5.Beep.tone(1600, 100, settings().soundVolume);
     }
 
     // Start WiFi connection

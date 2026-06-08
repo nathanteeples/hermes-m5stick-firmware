@@ -519,8 +519,8 @@ inline void runSetupWizard() {
 
   // Chirp twice to indicate setup mode active
   if (settings().sound) {
-    M5.Beep.tone(1000, 100); delay(100);
-    M5.Beep.tone(1000, 100);
+    M5.Beep.tone(1000, 100, settings().soundVolume); delay(100);
+    M5.Beep.tone(1000, 100, settings().soundVolume);
   }
 
   uint32_t frame = 0;
@@ -609,7 +609,7 @@ inline void runSetupWizard() {
 
   // Chirp and restart
   if (settings().sound) {
-    M5.Beep.tone(1500, 300); delay(300);
+    M5.Beep.tone(1500, 300, settings().soundVolume); delay(300);
   }
   ESP.restart();
 }
