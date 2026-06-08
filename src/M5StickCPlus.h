@@ -188,6 +188,28 @@ static constexpr int HOSYOND_I2S_BCK = 5;
 static constexpr int HOSYOND_I2S_DIN = 6;
 static constexpr int HOSYOND_I2S_WS = 7;
 static constexpr int HOSYOND_I2S_DOUT = 8;
+static constexpr uint8_t HOSYOND_FT6336_ADDR = 0x38;
+static constexpr uint8_t HOSYOND_FT6336_TOUCHES_REG = 0x02;
+
+inline bool hosyondI2CInit() {
+  static bool ready = false;
+  if (ready) return true;
+  const i2c_config_t cfg = {
+    .mode = I2C_MODE_MASTER,
+    .sda_io_num = HOSYOND_I2C_SDA,
+    .scl_io_num = HOSYOND_I2C_SCL,
+    .sda_pullup_en = GPIO_PULLUP_ENABLE,
+    .scl_pullup_en = GPIO_PULLUP_ENABLE,
+    .master = {
+      .clk_speed = 400000,
+    },
+  };
+  if (i2c_param_config(I2C_NUM_0, &cfg) != ESP_OK) return false;
+  esp_err_t err = i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return false;
+  ready = true;
+  return true;
+}
 
 struct RTC_TimeTypeDef {
   uint8_t Hours;
@@ -324,6 +346,82 @@ private:
   uint32_t _pressedAt = 0;
 };
 
+class TouchButton_Compat {
+public:
+  void begin() {
+    pinMode(HOSYOND_TOUCH_INT, INPUT_PULLUP);
+    hosyondI2CInit();
+    _lastRaw = rawPressed();
+    _stable = _lastRaw;
+  }
+
+  void update(uint32_t now = millis()) {
+    bool raw = rawPressed();
+    if (raw != _lastRaw) {
+      _lastRaw = raw;
+      _lastChange = now;
+    }
+    if ((now - _lastChange) >= 20 && raw != _stable) {
+      bool old = _stable;
+      _stable = raw;
+      if (_stable) {
+        _pressedAt = now;
+        _longReported = false;
+      } else if (old) {
+        _released = true;
+        _clicked = (now - _pressedAt) < 600;
+      }
+    }
+  }
+
+  bool isPressed() const { return _stable; }
+
+  bool wasReleased() {
+    bool v = _released;
+    _released = false;
+    return v;
+  }
+
+  bool wasClicked() {
+    bool v = _clicked;
+    _clicked = false;
+    return v;
+  }
+
+  bool pressedFor(uint32_t ms) {
+    if (!_stable || _longReported || millis() - _pressedAt < ms) return false;
+    _longReported = true;
+    return true;
+  }
+
+private:
+  bool rawPressed() const {
+    if (!hosyondI2CInit()) return false;
+    uint8_t reg = HOSYOND_FT6336_TOUCHES_REG;
+    uint8_t touches = 0;
+    esp_err_t err = i2c_master_write_read_device(
+      I2C_NUM_0,
+      HOSYOND_FT6336_ADDR,
+      &reg,
+      1,
+      &touches,
+      1,
+      pdMS_TO_TICKS(5)
+    );
+    if (err != ESP_OK) return false;
+    touches &= 0x0F;
+    return touches > 0 && touches <= 2;
+  }
+
+  bool _lastRaw = false;
+  bool _stable = false;
+  bool _released = false;
+  bool _clicked = false;
+  bool _longReported = false;
+  uint32_t _lastChange = 0;
+  uint32_t _pressedAt = 0;
+};
+
 class RTC_Compat {
 public:
   void GetTime(RTC_TimeTypeDef* time) {
@@ -406,7 +504,7 @@ public:
 
   bool begin() {
     if (_begun) return true;
-    if (!initI2C()) return false;
+    if (!hosyondI2CInit()) return false;
 
     pinMode(HOSYOND_AP_ENABLE, OUTPUT);
     digitalWrite(HOSYOND_AP_ENABLE, LOW);
@@ -464,25 +562,6 @@ public:
   bool isRecording() const { return _recording; }
 
 private:
-  bool initI2C() {
-    if (_i2cReady) return true;
-    const i2c_config_t cfg = {
-      .mode = I2C_MODE_MASTER,
-      .sda_io_num = HOSYOND_I2C_SDA,
-      .scl_io_num = HOSYOND_I2C_SCL,
-      .sda_pullup_en = GPIO_PULLUP_ENABLE,
-      .scl_pullup_en = GPIO_PULLUP_ENABLE,
-      .master = {
-        .clk_speed = 400000,
-      },
-    };
-    if (i2c_param_config(I2C_NUM_0, &cfg) != ESP_OK) return false;
-    esp_err_t err = i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return false;
-    _i2cReady = true;
-    return true;
-  }
-
   static void recordTaskThunk(void* arg) {
     static_cast<Mic_Compat*>(arg)->recordTask();
   }
@@ -505,7 +584,6 @@ private:
   config_t _cfg;
   volatile bool _recording = false;
   bool _begun = false;
-  bool _i2cReady = false;
   int16_t* _dst = nullptr;
   size_t _samples = 0;
   size_t _written = 0;
@@ -517,8 +595,8 @@ public:
   HosyondGFX Lcd;
   IMU_Compat Imu;
   RTC_Compat Rtc;
-  Button_Compat BtnA = Button_Compat(HOSYOND_BTN_A, true);
-  Button_Compat BtnB = Button_Compat(HOSYOND_TOUCH_INT, true);
+  TouchButton_Compat BtnA;
+  Button_Compat BtnB = Button_Compat(HOSYOND_BTN_A, true);
   Button_Compat BtnPWR = Button_Compat(-1, true);
   Mic_Compat Mic;
   AXP192_Compat Axp;

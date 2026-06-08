@@ -11,6 +11,9 @@ extern TFT_eSprite spr;
 extern const int W;
 extern const int H;
 extern bool buddyMode;
+#ifndef HERMES_DISPLAY_X_OFFSET
+#define HERMES_DISPLAY_X_OFFSET 0
+#endif
 
 enum SetupPersonaState { 
   SETUP_P_SLEEP, 
@@ -29,7 +32,7 @@ inline void runSetupWizard() {
   spr.setTextSize(1);
   spr.setTextColor(0xFFFF, 0x0842);
   spr.drawString("Scanning Wi-Fi...", W / 2, H / 2);
-  spr.pushSprite(0, 0);
+  spr.pushSprite(HERMES_DISPLAY_X_OFFSET, 0);
 
   // Scan networks
   WiFi.mode(WIFI_STA);
@@ -583,7 +586,7 @@ inline void runSetupWizard() {
         spr.fillCircle(10, 227, 4, dotCol);
       }
       
-      spr.pushSprite(0, 0);
+      spr.pushSprite(HERMES_DISPLAY_X_OFFSET, 0);
     }
     
     if (shouldReboot && millis() > rebootTime) {

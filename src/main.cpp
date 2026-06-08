@@ -50,7 +50,11 @@ static void startBt() {
 #ifndef HERMES_DISPLAY_H
 #define HERMES_DISPLAY_H 240
 #endif
+#ifndef HERMES_DISPLAY_X_OFFSET
+#define HERMES_DISPLAY_X_OFFSET 0
+#endif
 const int W = HERMES_DISPLAY_W, H = HERMES_DISPLAY_H;
+const int DISPLAY_X_OFFSET = HERMES_DISPLAY_X_OFFSET;
 const int CX = W / 2;
 const int CY_BASE = 120;
 #ifndef HERMES_LED_PIN
@@ -1485,7 +1489,7 @@ void drawVoiceProcessing() {
     spr.drawString(voiceCancelling ? "please wait" : "B to cancel", CX, H - 18);
     spr.setTextDatum(TL_DATUM);
     drawInsetBorder(&spr, p.textDim);
-    spr.pushSprite(0, 0);
+    spr.pushSprite(DISPLAY_X_OFFSET, 0);
     voiceProcFirstDraw = true;   // re-init the direct path if the sprite is freed again
     return;
   }
@@ -2196,7 +2200,7 @@ void setup() {
           // Phase 3: Graphic welcome
           drawGraphicWelcome(elapsed, wifiConnected, frame, p);
         }
-        spr.pushSprite(0, 0);
+        spr.pushSprite(DISPLAY_X_OFFSET, 0);
       } else {
         M5.Lcd.fillScreen(p.bg);
         M5.Lcd.setTextDatum(MC_DATUM);
@@ -2697,9 +2701,9 @@ void loop() {
       else if (sessionsOpen) drawSessions();
       else if (settingsOpen) drawSettings();
       else if (menuOpen) drawMenu();
-      spr.pushSprite(0, 0);
+      spr.pushSprite(DISPLAY_X_OFFSET, 0);
     } else if (voiceState == VOICE_RESPONSE || voiceState == VOICE_ERROR) {
-      spr.pushSprite(0, 0);
+      spr.pushSprite(DISPLAY_X_OFFSET, 0);
     }
   }
 
