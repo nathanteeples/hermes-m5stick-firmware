@@ -69,6 +69,8 @@ static void statusLedWrite(bool on);
 
 static void statusLedBegin() {
 #ifdef HERMES_BOARD_HOSYOND_ES3C28P
+  statusLedWrite(true);
+  delay(120);
   statusLedWrite(false);
 #else
   pinMode(LED_PIN, OUTPUT);
@@ -79,30 +81,40 @@ static void statusLedBegin() {
 static void statusLedWrite(bool on) {
 #ifdef HERMES_BOARD_HOSYOND_ES3C28P
   static rmt_obj_t* rmt = nullptr;
+  static bool hasState = false;
+  static bool lastOn = false;
+  if (hasState && on == lastOn) return;
   if (!rmt) {
+    pinMode(LED_PIN, OUTPUT);
     rmt = rmtInit(LED_PIN, RMT_TX_MODE, RMT_MEM_64);
     if (!rmt) return;
     rmtSetTick(rmt, 100);
   }
 
+  constexpr uint8_t PIXELS = 60;
   uint8_t green = on ? 12 : 0;
   uint8_t red = on ? 36 : 0;
   uint8_t blue = 0;
   uint8_t white = 0;
   uint8_t color[4] = { green, red, blue, white };
-  rmt_data_t data[32];
+  static rmt_data_t data[32 * PIXELS];
   int out = 0;
-  for (uint8_t c = 0; c < 4; c++) {
-    for (uint8_t bit = 0; bit < 8; bit++) {
-      bool high = color[c] & (1 << (7 - bit));
-      data[out].level0 = 1;
-      data[out].duration0 = high ? 8 : 4;
-      data[out].level1 = 0;
-      data[out].duration1 = high ? 4 : 8;
-      out++;
+  for (uint8_t pixel = 0; pixel < PIXELS; pixel++) {
+    for (uint8_t c = 0; c < 4; c++) {
+      for (uint8_t bit = 0; bit < 8; bit++) {
+        bool high = color[c] & (1 << (7 - bit));
+        data[out].level0 = 1;
+        data[out].duration0 = high ? 8 : 4;
+        data[out].level1 = 0;
+        data[out].duration1 = high ? 4 : 8;
+        out++;
+      }
     }
   }
-  rmtWriteBlocking(rmt, data, 32);
+  rmtWriteBlocking(rmt, data, out);
+  delayMicroseconds(80);
+  hasState = true;
+  lastOn = on;
 #else
   digitalWrite(LED_PIN, on ? HIGH : LOW);
 #endif
@@ -307,6 +319,7 @@ uint32_t lastResetReleaseTime = 0;
 
 bool    sessionsOpen = false;
 uint8_t sessScroll  = 0;
+uint32_t ledTestUntil = 0;
 
 static void applySetting(uint8_t idx) {
   Settings& s = settings();
@@ -331,7 +344,13 @@ static void applySetting(uint8_t idx) {
       applyDisplayMode();
       characterInvalidate();
       return;
-    case 5: s.led = !s.led; break;
+    case 5:
+      s.led = !s.led;
+      if (s.led) {
+        ledTestUntil = millis() + 1000;
+        statusLedWrite(true);
+      }
+      break;
     case 6: s.clockRot = (s.clockRot + 1) % 3; break;
     case 7: nextPet(); return;
     case 8: settingsOpen = false; sessionsOpen = true; sessScroll = 0; return;
@@ -2335,7 +2354,9 @@ void loop() {
 
   // LED: pulse on active prompt or attention state, otherwise off
   bool promptActive = (tama.promptId[0] && !responseSent);
-  if ((activeState == P_ATTENTION || promptActive) && settings().led) {
+  if (settings().led && (int32_t)(ledTestUntil - now) > 0) {
+    statusLedWrite(true);
+  } else if ((activeState == P_ATTENTION || promptActive) && settings().led) {
     statusLedWrite((now / 400) % 2);
   } else {
     statusLedWrite(false);

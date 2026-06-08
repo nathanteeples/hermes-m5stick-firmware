@@ -297,7 +297,7 @@ public:
       _lastRaw = raw;
       _lastChange = now;
     }
-    if ((now - _lastChange) >= 20 && raw != _stable) {
+    if ((now - _lastChange) >= 6 && raw != _stable) {
       bool old = _stable;
       _stable = raw;
       if (_stable) {
@@ -426,7 +426,7 @@ public:
       _lastRaw = raw;
       _lastChange = now;
     }
-    if ((now - _lastChange) >= 20 && raw != _stable) {
+    if ((now - _lastChange) >= 6 && raw != _stable) {
       bool old = _stable;
       _stable = raw;
       if (_stable) {
